@@ -1,0 +1,125 @@
+import Foundation
+import UIKit
+
+class ForceUpdateChecker {
+    
+    static let shared = ForceUpdateChecker()
+    //1
+    enum UpdateStatus {
+        case forceUpdate
+        case softUpdate
+        case noUpdate
+    }
+    
+    //2
+    static let TAG = "ForceUpdateChecker"
+    static let STORE_URL = "store_url"
+    static let MINIMUM_VERSION = "minimum_version"
+    static let CURRENT_VERSION = "current_version"
+    
+    
+    //1 For Force update
+    static var appVersionBundle: String {
+        guard
+            let info = Bundle.main.infoDictionary,
+            let version = info["CFBundleShortVersionString"] as? String
+        else { return "" }
+        return version
+    }
+    
+    //2 For Soft update
+    static var appBuildBundle: String {
+        guard
+            let info = Bundle.main.infoDictionary,
+            let version = info["CFBundleVersion"] as? String
+        else { return "" }
+        return version
+    }
+    
+    //4
+    func check() -> UpdateStatus {
+        let remoteConfig = RemoteConfig.remoteConfig()
+       
+        guard let appMinimumVersion = remoteConfig[ForceUpdateChecker.MINIMUM_VERSION].stringValue else {
+            
+            return .noUpdate
+        }
+        guard let appCurrentVersion = remoteConfig[ForceUpdateChecker.CURRENT_VERSION].stringValue else {
+            return .noUpdate
+        }
+        
+        
+        if ForceUpdateChecker.appBuildBundle.compare(appMinimumVersion,options:.numeric) == ComparisonResult.orderedDescending {
+            
+            if ForceUpdateChecker.appBuildBundle.compare(appCurrentVersion,options:.numeric) == ComparisonResult.orderedAscending {
+                
+                return .softUpdate
+            }
+            else {
+                return .noUpdate
+            }
+        }
+        else {
+            return .forceUpdate
+        }
+    }
+    
+    func setUpRemoteConfig() {
+
+        let remoteConfig = RemoteConfig.remoteConfig()
+
+        let defaults : [String : Any] = [
+            ForceUpdateChecker.MINIMUM_VERSION : "1.0.0",
+            ForceUpdateChecker.CURRENT_VERSION : "1.0.0",
+            ForceUpdateChecker.STORE_URL : "https://itunes.apple.com/br/app/myapp/id1234567"
+        ]
+
+        let expirationDuration = 0
+
+        remoteConfig.setDefaults(defaults as? [String : NSObject])
+
+        remoteConfig.fetch(withExpirationDuration: TimeInterval(expirationDuration)) { (status, error) in
+            if status == .success {
+                remoteConfig.activate()
+            } else {
+                print("Error: \(error?.localizedDescription ?? "No error available.")")
+            }
+        }
+    }
+    func verifyVersion() {
+        
+        self.setUpRemoteConfig()
+
+        if !(ForceUpdateChecker.shared.check() == .noUpdate) {
+            let alert = UIAlertController(title: "New version avaiable",
+                                          message: "There are new features avaiable, please update your app",
+                                          preferredStyle: .alert)
+            let action = UIAlertAction(title: "Update", style: .default, handler: goToAppStore(action:))
+            alert.addAction(action)
+            if ForceUpdateChecker.shared.check() == .softUpdate {
+                let action = UIAlertAction(title: "Cancel", style: .default, handler: nil)
+                alert.addAction(action)
+            }
+            UIApplication.shared.keyWindow?.rootViewController?.present(alert, animated: true)
+        }
+    }
+    
+    func goToAppStore(action: UIAlertAction) {
+        let appId = "1234567"
+        UIApplication.shared.openAppStore(for: appId)
+    }
+}
+extension UIApplication {
+    
+    func openAppStore(for appID: String) {
+        let appStoreURL = "https://itunes.apple.com/app/\(appID)"
+        guard let url = URL(string: appStoreURL) else {
+            return
+        }
+        DispatchQueue.main.async {
+            if self.canOpenURL(url) {
+                self.open(url)
+            }
+        }
+    }
+}
