@@ -61,4 +61,4 @@ ForceUpdateChecker.shared.verifyVersion()
 
 
 
-Built with 💙 by Manpreet Singh(Sr. iOS Developer)
+Built with 💙 by Manpreet Singh(iOS Developer)
